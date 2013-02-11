@@ -2,6 +2,8 @@ import xml.etree.ElementTree as ET
 import datetime
 import urllib, urllib2
 import logging
+import re
+import cookielib
 
 _log = logging.getLogger("fitbit")
 
@@ -10,13 +12,10 @@ class Client(object):
     see README for more details
     """
     
-    def __init__(self, user_id, sid, uid, uis, url_base="http://www.fitbit.com"):
+    def __init__(self, user_id, opener, url_base="http://www.fitbit.com"):
         self.user_id = user_id
-        self.sid = sid
-        self.uid = uid
-        self.uis = uis
+        self.opener = opener
         self.url_base = url_base
-        self._request_cookie = "sid=%s; uid=%s; uis=%s" % (sid, uid, uis)
     
     def intraday_calories_burned(self, date):
         """Retrieve the calories burned every 5 minutes
@@ -55,12 +54,12 @@ class Client(object):
         
         query_str = urllib.urlencode(parameters)
 
-        request = urllib2.Request("%s%s?%s" % (self.url_base, path, query_str), headers={"Cookie": self._request_cookie})
+        request = urllib2.Request("%s%s?%s" % (self.url_base, path, query_str))
         _log.debug("requesting: %s", request.get_full_url())
 
         data = None
         try:
-            response = urllib2.urlopen(request)
+            response = self.opener.open(request)
             data = response.read()
             response.close()
         except urllib2.HTTPError as httperror:
@@ -123,3 +122,32 @@ class Client(object):
         
         values = [int(float(v.text)) for v in xml.findall("data/chart/graphs/graph/value")]
         return zip(datetimes, values)
+    
+    @staticmethod
+    def login(email, password, base_url="https://www.fitbit.com"):
+        cj = cookielib.CookieJar()
+        opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
+
+        # Get the login page so we can load the magic values
+        login_page = opener.open(base_url + "/login").read()
+
+        source_page = re.search(r"""name="_sourcePage".*?value="([^"]+)["]""", login_page).group(1)
+        fp = re.search(r"""name="__fp".*?value="([^"]+)["]""", login_page).group(1)
+
+        data = urllib.urlencode({
+                "email": email, "password": password,
+                "_sourcePage": source_page, "__fp": fp,
+                "login": "Log In", "includeWorkflow": "false",
+                "redirect": "", "rememberMe": "true"
+            })
+
+        logged_in = opener.open(base_url + "/login", data)
+
+        if logged_in.geturl() == "http://www.fitbit.com/":
+            page = logged_in.read()
+        
+            user_id = re.search(r"""class="profile" href="/user/([^"]+)["]""", page).group(1)
+
+            return Client(user_id, opener, base_url)
+        else:
+            raise ValueError, "Incorrect username or password."
