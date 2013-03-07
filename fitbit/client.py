@@ -146,7 +146,7 @@ class Client(object):
         if logged_in.geturl() == "http://www.fitbit.com/":
             page = logged_in.read()
         
-            user_id = re.search(r"""class="profile" href="/user/([^"]+)["]""", page).group(1)
+            user_id = re.search(r"""userId=([a-zA-Z0-9]+)""", page).group(1)
 
             return Client(user_id, opener, base_url)
         else:
