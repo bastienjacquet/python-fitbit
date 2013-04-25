@@ -11,6 +11,8 @@ import os
 import sys
 import time
 
+sys.path.append(os.getcwd())
+
 import fitbit
 
 EMAIL=sys.argv[1]
