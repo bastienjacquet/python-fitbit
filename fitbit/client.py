@@ -1,9 +1,27 @@
 import xml.etree.ElementTree as ET
 import datetime
-import urllib, urllib2
+
+import urllib
+try:
+    import urllib2
+except ImportError:
+    import urllib.request
+    import urllib.parse
+    Request = urllib.request.Request
+    build_opener = urllib.request.build_opener
+    HTTPCookieProcessor = urllib.request.HTTPCookieProcessor
+    urlencode = urllib.parse.urlencode
+else:
+    Request = urllib2.Request
+    build_opener = urllib2.build_opener
+    HTTPCookieProcessor = urllib2.HTTPCookieProcessor
+    urlencode = urllib.urlencode
 import logging
 import re
-import cookielib
+try:
+    import cookielib
+except ImportError:
+    import http.cookiejar as cookielib
 
 _log = logging.getLogger("fitbit")
 
@@ -52,9 +70,9 @@ class Client(object):
         # Throw out parameters where the value is not None
         parameters = dict([(k,v) for k,v in parameters.items() if v])
         
-        query_str = urllib.urlencode(parameters)
+        query_str = urlencode(parameters)
 
-        request = urllib2.Request("%s%s?%s" % (self.url_base, path, query_str))
+        request = Request("%s%s?%s" % (self.url_base, path, query_str))
         _log.debug("requesting: %s", request.get_full_url())
 
         data = None
@@ -62,7 +80,7 @@ class Client(object):
             response = self.opener.open(request)
             data = response.read()
             response.close()
-        except urllib2.HTTPError as httperror:
+        except HTTPError as httperror:
             data = httperror.read()
             httperror.close()
 
@@ -91,7 +109,7 @@ class Client(object):
         xml = self._graphdata_intraday_xml_request(graph_type, date)
         
         base_time = datetime.datetime.combine(date, datetime.time())
-        timestamps = [base_time + datetime.timedelta(minutes=m) for m in xrange(0, 288*5, 5)]
+        timestamps = [base_time + datetime.timedelta(minutes=m) for m in range(0, 288*5, 5)]
         values = [int(float(v.text)) for v in xml.findall("data/chart/graphs/graph/value")]
         return zip(timestamps, values)
     
@@ -126,28 +144,28 @@ class Client(object):
     @staticmethod
     def login(email, password, base_url="https://www.fitbit.com"):
         cj = cookielib.CookieJar()
-        opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
+        opener = build_opener(HTTPCookieProcessor(cj))
 
         # Get the login page so we can load the magic values
-        login_page = opener.open(base_url + "/login").read()
+        login_page = opener.open(base_url + "/login").read().decode("utf8")
 
         source_page = re.search(r"""name="_sourcePage".*?value="([^"]+)["]""", login_page).group(1)
         fp = re.search(r"""name="__fp".*?value="([^"]+)["]""", login_page).group(1)
 
-        data = urllib.urlencode({
+        data = urlencode({
                 "email": email, "password": password,
                 "_sourcePage": source_page, "__fp": fp,
                 "login": "Log In", "includeWorkflow": "false",
                 "redirect": "", "rememberMe": "true"
-            })
+            }).encode("utf8")
 
         logged_in = opener.open(base_url + "/login", data)
 
         if logged_in.geturl() == "http://www.fitbit.com/":
-            page = logged_in.read()
+            page = logged_in.read().decode("utf8")
         
             user_id = re.search(r"""userId=([a-zA-Z0-9]+)""", page).group(1)
 
             return Client(user_id, opener, base_url)
         else:
-            raise ValueError, "Incorrect username or password."
+            raise ValueError("Incorrect username or password.")
