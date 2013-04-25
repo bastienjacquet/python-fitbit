@@ -119,7 +119,10 @@ class Client(object):
         
         
         elements = xml.findall("data/chart/graphs/graph/value")
-        timestamps = [datetime.datetime.strptime(e.attrib['description'].split(' ')[-1], "%I:%M%p") for e in elements]
+        try:
+            timestamps = [datetime.datetime.strptime(e.attrib['description'].split(' ')[-1], "%I:%M%p") for e in elements]
+        except ValueError:
+            timestamps = [datetime.datetime.strptime(e.attrib['description'].split(‘ ‘)[-1], "%H:%M") for e in elements]
         
         # TODO: better way to figure this out?
         # Check if the timestamp cross two different days
