@@ -11,11 +11,13 @@ except ImportError:
     build_opener = urllib.request.build_opener
     HTTPCookieProcessor = urllib.request.HTTPCookieProcessor
     urlencode = urllib.parse.urlencode
+    HTTPError = urllib.HTTPError
 else:
     Request = urllib2.Request
     build_opener = urllib2.build_opener
     HTTPCookieProcessor = urllib2.HTTPCookieProcessor
     urlencode = urllib.urlencode
+    HTTPError = urllib2.HTTPError
 import logging
 import re
 try:
@@ -86,7 +88,7 @@ class Client(object):
 
         #_log.debug("response: %s", data)
 
-        return ET.fromstring(data.strip())
+        return ET.fromstring(data.strip().replace("&hellip;", "..."))
 
     def _graphdata_intraday_xml_request(self, graph_type, date, data_version=2108, **kwargs):
         params = dict(

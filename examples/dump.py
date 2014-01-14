@@ -3,8 +3,13 @@
 This is an example script to dump all available fitbit data.
 This can be set up in a cronjob to dump data daily.
 
+You can add your passwords to a file ~/.fitbit in the form below and then you don't need to include it on the command line.
+
+email1:password1
+email2:password2
+
 Run with the following parameters:
-$ python dump.py <email> <password> <directory>
+$ python dump.py <email> <password - optional> <directory>
 """
 import datetime
 import os
@@ -16,8 +21,15 @@ sys.path.append(os.getcwd())
 import fitbit
 
 EMAIL=sys.argv[1]
-PASSWORD=sys.argv[2]
-DUMP_DIR=sys.argv[3]
+
+if len(sys.argv) == 3:
+    fp = open(os.path.expanduser("~/.fitbit"), "r")
+    PASSWORD = [line.split(":")[1] for line in fp.readlines() if line.split(":")[0] == EMAIL][0].strip()
+
+    DUMP_DIR=sys.argv[2]
+else:
+    PASSWORD = sys.argv[2]
+    DUMP_DIR = sys.argv[3]
 
 def dump_to_str(data):
     return "\n".join(["%s,%s" % (str(ts), v) for ts, v in data])
