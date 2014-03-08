@@ -166,7 +166,7 @@ class Client(object):
 
         logged_in = opener.open(base_url + "/login", data)
 
-        if logged_in.geturl() == "http://www.fitbit.com/":
+        if logged_in.geturl() == "http://www.fitbit.com/" or logged_in.geturl() == "https://www.fitbit.com/":
             page = logged_in.read().decode("utf8")
         
             match = re.search(r"""userId=([a-zA-Z0-9]+)""", page)
