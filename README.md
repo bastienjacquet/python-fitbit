@@ -1,22 +1,12 @@
 # Overview
 
-This client provides a simple way to access your data on www.fitbit.com.
-I love my fitbit and I want to be able to use the raw data to make my own graphs.
-Currently, this client uses the endpoints used by the flash graphs.
-Once the official API is announced, this client will be updated to use it.
-
-Right now, you need to log in to the site with your username / password, and then grab some information from the cookie.
-The cookie will look like:
-
-    Cookie: sid=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX; uid=12345; uis=XX%3D%3D;
-  
-Create a `fitbit.Client` with this data, plus the userId (which you can find at the end of your profile url)
+This client provides a simple way to reclaim more of your data from www.fitbit.com than is possible with the official API.
 
 # Example
 
     import fitbit
 
-    client = fitbit.Client(user_id="XXX", sid="XXX", uid="XXX", uis="XXX")
+    client = fitbit.Client.login(user, password)
 
     # example data
     data = client.intraday_steps(datetime.date(2010, 2, 21))
@@ -31,7 +21,7 @@ Create a `fitbit.Client` with this data, plus the userId (which you can find at 
     
     # The timestamp is the beginning of the 5 minute range the value is for
     
-    # Other API calls:
+    # Other intraday calls:
     data = client.intraday_calories_burned(datetime.date(2010, 2, 21))
     data = client.intraday_active_score(datetime.date(2010, 2, 21))
     
@@ -52,5 +42,41 @@ Create a `fitbit.Client` with this data, plus the userId (which you can find at 
     #   1: asleep
     #   2: awake
     #   3: very awake
+
+    # Activity log
+    logs=client.activity_logs(datetime.date(2014, 5, 16))  
+
+    # data will be a list of (id,timestamp,name,steps,distance (km),duration (s),calories) tuples
+    # [
+    #   (12345678, datetime.datetime(2014, 5, 16, 10, 16, tzinfo=tzlocal()), u'Activity record', 74, 0.0654321, datetime.timedelta(0, 660), 22),
+    #   (12345679, datetime.datetime(2014, 5, 16, 11, 10, tzinfo=tzlocal()), u'Activity record', 100, 0.0876543, datetime.timedelta(0, 780), 30),
+    #   ...
+    # ]
+
+    # Activity log data
+    for log in logs:
+        activity_step_data=client.activity_log_data_steps(datetime.date(2014, 5, 16),log[0])
+
+        # data will be a list of (timestamp,steps) tuples at one minute intervals
+        # [
+        #   (datetime.datetime(2014, 5, 16, 10, 16), 120), 
+        #   (datetime.datetime(2014, 5, 16, 10, 17), 122),
+        #   ...
+        # ]
+
+        # other activity log data calls with similar tuple results
+        activity_calory_data=client.activity_log_data_calories(datetime.date(2014, 5, 16),log[0])
+        activity_floor_data=client.activity_log_data_floors(datetime.date(2014, 5, 16),log[0])
+        activity_pace_data=client.activity_log_data_pace(datetime.date(2014, 5, 16),log[0])
+
+        # or get all of them in one go:
+        client.activity_log_data_all(datetime.date(2014, 5, 16),log[0])
+
+        # data will be a list of (timestamp,calories,steps,floors,pace) tuples at one minute intervals
+        # [
+        #   (datetime.datetime(2014, 5, 16, 10, 25), 4, 53, 0, 35), 
+        #   (datetime.datetime(2014, 5, 16, 10, 26), 3, 5, 0, 378),
+        #   ...
+        # ]
 
 There is also an example dump script provided: `examples/dump.py`.  This script can be set up as a cron job to dump data nightly.
