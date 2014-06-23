@@ -299,6 +299,11 @@ class Client(object):
         cj = cookielib.CookieJar()
         opener = build_opener(HTTPCookieProcessor(cj))
 
+        # fitbit.com wierdness - as of 2014-06-20 the /login page gives a 500: Internal Server Error
+        # if there's no cookie
+        # Workaround: open the https://www.fitbit.com/ page first to get a cookie
+        opener.open(base_url);
+
         # Get the login page so we can load the magic values
         login_page = opener.open(base_url + "/login").read().decode("utf8")
 
