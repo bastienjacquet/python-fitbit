@@ -76,7 +76,9 @@ class Client(object):
         the format is: [(id,datetime.datetime,name,steps,distance,duration,calories), ...]
         """
         json_data=self._api2request("GET /api/2/user/activities/logs","user","getActivitiesLogs",{"fromDate":str(date),"toDate":str(date),"period":"day","offset":0,"limit":10})
-        values = [Client._marshall_activity_log(log) for log in json_data]
+        values=map(lambda log:Client._marshall_activity_log(log),json_data)
+        # fitbit api getActivitiesLogs no longer filters by date so do it ourselves
+        values=filter(lambda log:log[1].date()==date,values)
         return values
 
     def activity_log_data_calories(self,date,id):
