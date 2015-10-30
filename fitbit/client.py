@@ -300,6 +300,7 @@ class Client(object):
     def login(email, password, base_url="https://www.fitbit.com"):
         cj = cookielib.CookieJar()
         opener = build_opener(HTTPCookieProcessor(cj))
+        opener.addheaders = [("User-agent", "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36")]
 
         # fitbit.com wierdness - as of 2014-06-20 the /login page gives a 500: Internal Server Error
         # if there's no cookie
@@ -321,7 +322,8 @@ class Client(object):
 
         logged_in = opener.open(base_url + "/login", data)
 
-        if logged_in.geturl() == "http://www.fitbit.com/" or logged_in.geturl() == "https://www.fitbit.com/":
+        if logged_in.geturl() == "http://www.fitbit.com/" or logged_in.geturl() == "https://www.fitbit.com/" \
+                or logged_in.geturl() == "https://www.fitbit.com:443/":
             page = logged_in.read().decode("utf8")
         
             match = re.search(r"""userId=([a-zA-Z0-9]+)""", page)
