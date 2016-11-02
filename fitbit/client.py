@@ -1,5 +1,8 @@
+# -*- coding: utf-8 -*-
 import xml.etree.ElementTree as ET
-import datetime
+from xml.etree.ElementTree import XMLParser
+import json
+import datetime, time
 
 import urllib
 try:
@@ -28,6 +31,7 @@ except ImportError:
 import dateutil.parser
 import json
 
+logging.basicConfig(filename='example.log', filemode='w', level=logging.DEBUG)
 _log = logging.getLogger("fitbit")
 
 class Client(object):
@@ -52,6 +56,18 @@ class Client(object):
         """
         return self._graphdata_intraday_request("intradayActiveScore", date)
 
+    def intraday_distance(self, date):
+        """Retrieve the active score for every 5 minutes
+        the format is: [(datetime.datetime, active_score), ...]
+        """
+        return self._graphdata_intraday_request("intradayActiveScore", date)
+
+    def intraday_floor_climbed(self, date):
+        """Retrieve the active score for every 5 minutes
+        the format is: [(datetime.datetime, active_score), ...]
+        """
+        return self._graphdata_intraday_request("intradayFloors", date)
+
     def intraday_steps(self, date):
         """Retrieve the steps for every 5 minutes
         the format is: [(datetime.datetime, steps), ...]
@@ -70,7 +86,7 @@ class Client(object):
         or you will just get the first sleep of the day
         """
         return self._graphdata_intraday_sleep_request("intradaySleep", date, sleep_id=sleep_id)
-
+    
     def activity_logs(self,date):
         """Retrieve the available activity logs for the given date
         the format is: [(id,datetime.datetime,name,steps,distance,duration,calories), ...]
@@ -128,15 +144,15 @@ class Client(object):
             [ l[1] for l in floors],
             [ l[1] for l in pace])
 
-    def _request(self, path, parameters):
-        data=self._request_raw(path, parameters)
+    def _request(self, path, parameters, request_body=""):
+        data=self._request_raw(path, parameters, request_body=request_body)
         return ET.fromstring(data.strip().replace("&hellip;", "..."))
 
-    def _request_json(self, path, post_data,method):
-        data=self._request_raw(path, post_data,method)
+    def _request_json(self, path, post_data, method, request_body=""):
+        data=self._request_raw(path, post_data, method, request_body)
         return json.loads(data)
 
-    def _request_raw(self, path, parameters,method="GET"):
+    def _request_raw(self, path, parameters,method="GET", request_body=""):
 
         if method == "POST":
             request = Request("%s%s" % (self.url_base, path),parameters)
@@ -144,10 +160,9 @@ class Client(object):
             # Throw out parameters where the value is not None
             parameters = dict([(k,v) for k,v in parameters.items() if v])
             query_str = urlencode(parameters)
-            request = Request("%s%s?%s" % (self.url_base, path, query_str))
+            request = Request("%s%s?%s" % (self.url_base, path, query_str), request_body)
         
         _log.debug("requesting (%s): %s", method,request.get_full_url())
-
         data = None
         try:
             response = self.opener.open(request)
@@ -156,11 +171,9 @@ class Client(object):
         except HTTPError as httperror:
             data = httperror.read()
             httperror.close()
+        _log.debug("response: %s", data.strip())
+        return data.strip()
 
-        #_log.debug("response: %s", data)
-
-        return data
-  
     def _graphdata_intraday_xml_request(self, graph_type, date, data_version=2108, **kwargs):
         params = dict(
             userId=self.user_id,
@@ -177,6 +190,26 @@ class Client(object):
 
         return self._request("/graph/getGraphData", params)
 
+    def _graphdata_intraday_xml_request_new(self, graph_type, date, **kwargs):
+        params = dict(
+            userId=self.user_id,
+            type=graph_type,
+            apiFormat="json",
+            dateTo=str(date),
+            dateFrom=str(date),
+            ts=time.time()*1000
+        )
+
+        if kwargs:
+            params.update(kwargs)
+
+        return json.loads(self._request_raw("/graph/getNewGraphData", params))
+
+    def _ajax_request(self,requestObject):
+        request_body={"serviceCalls":[requestObject],"template":"activities/modules/models/ajax.response.json.jsp"}
+        request_json= urlencode({"request":json.dumps(request_body, separators=(',',':'))})
+        return json.loads(self._request_raw("/ajaxapi", {},request_body=request_json))
+
     def _graphdata_intraday_request(self, graph_type, date):
         # This method used for the standard case for most intraday calls (data for each 5 minute range)
         xml = self._graphdata_intraday_xml_request(graph_type, date)
@@ -186,6 +219,44 @@ class Client(object):
         values = [int(float(v.text)) for v in xml.findall("data/chart/graphs/graph/value")]
         return zip(timestamps, values)
     
+    def _get_day_details(self,details,date,timeStart=["0","0"],timeEnd=["23","59"]):
+        activity={"isAnnotation":True,
+                        "date":str(date),
+                        "clock":"24",
+                        "create":"on",
+                        "apiFormat":"htmljson",
+                        "name":"test",
+                        "annotationStartTimeHours":timeStart[0],
+                        "annotationStartTimeMinutes":timeStart[1],
+                        "annotationEndTimeHours":timeEnd[0],
+                        "annotationEndTimeMinutes":timeEnd[1],
+                        "annotationEndTimeDay":"same",
+                        "note":"Virtual day activity",
+                        "manualCaloriesEnabled":False}
+
+        request={"id":"POST /api/2/user/activities/annotations",
+                        "name":"user",
+                        "method":"postActivitiesAnnotations",
+                        "args":{"activity":json.dumps(activity, separators=(',',':'))        }}
+        response= self._ajax_request(request)
+        data={};
+        for reqId,reqResponse in response.items():
+            if reqResponse['status']==200:
+                activityId=reqResponse['result']['id']
+                #print reqResponse['result']
+                for graphtype in details:
+                    graphData =self._graphdata_intraday_xml_request_new("activityRecord"+graphtype,reqResponse['result']['date'],arg=activityId)
+                    dataPoints=graphData["graph"]["dataSets"]["activity"]["dataPoints"]
+                    if not data.has_key(graphtype):data[graphtype]=[]
+                    data[graphtype].extend([(d["dateTime"],d["value"]) for d in dataPoints])
+                    #print dataPoints
+                request={"id":"DELETE /api/2/user/activities/annotations/"+str(activityId),
+                        "name":"user",
+                        "method":"deleteActivitiesAnnotations",
+                        "args":{"activityId":activityId}}
+                self._ajax_request(request)
+        return data
+
     def _graphdata_intraday_sleep_request(self, graph_type, date, sleep_id=None):
         # Sleep data comes back a little differently
         xml = self._graphdata_intraday_xml_request(graph_type, date, data_version=2112, arg=sleep_id)

@@ -77,10 +77,14 @@ def dump_day(c, date):
         return False
 
     dump_to_file("steps", date, steps)
-    dump_to_file("calories", date, c.intraday_calories_burned(date))
-    dump_to_file("active_score", date, c.intraday_active_score(date))
+    #dump_to_file("calories", date, c.intraday_calories_burned(date))
+    #dump_to_file("floor", date, c.intraday_floor_climbed(date))
+    #dump_to_file("active_score", date, c.intraday_active_score(date))
     dump_to_file("sleep", date, c.intraday_sleep(date))
-
+    detailed=["CaloriesBurned","Steps","Floors","Pace"]
+    data=c._get_day_details(detailed,date)
+    for datatype in detailed:
+        dump_to_file(datatype, date, data[datatype])
     return True
 
 if __name__ == '__main__':
