@@ -166,7 +166,7 @@ class Client(object):
         data = None
         try:
             response = self.opener.open(request)
-            data = response.read()
+            data = response.read().replace("&hellip;", "...").replace("d'éveil", "d éveil")
             response.close()
         except HTTPError as httperror:
             data = httperror.read()
