@@ -289,32 +289,34 @@ class Client(object):
         values = [int(float(v.text)) for v in xml.findall("data/chart/graphs/graph/value")]
         return zip(datetimes, values)
     
-    def _api2request(self,id,name,method,args):
-
-        c=json.dumps({"serviceCalls":
-                    [
-                    {
-                        "id":id,
+    def _api2request(self,id,name=None,method=None,args=None):
+        if name:
+            request= [{  "id":id,
                         "name":name,
                         "method":method,
-                        "args":args
-                    }
-                    ],"template":"activities/modules/models/ajax.response.json.jsp"},
+                        "args":args}]
+        else:
+            request = [{"id":r[0],
+                        "name":r[1],
+                        "method":r[2],
+                        "args":r[3]} for r in id]
+        c=json.dumps({"serviceCalls":request,"template":"activities/modules/models/ajax.response.json.jsp"},
                 separators=(',',':')
                 )
 
         api_data = urllib.urlencode(
             {   'request' :  c, 'csrfToken': self.csrfToken})
-
         json_data =  self._request_json('/ajaxapi', api_data,"POST")
+        if len(json_data)==1:
+            for service,result in json_data.items():
+                status=result.get('status',None)
+                value=result.get('result',None)
 
-        for service,result in json_data.items():
-            status=result.get('status',None)
-            value=result.get('result',None)
-
-            if (status==200 and result!=None):
-                #print service
-                return value
+                if (status==200 and result!=None):
+                    #print service
+                    return value
+        else:
+            return json_data
 
     def _activity_log_data(self,date,id,chart_type):
         json_data=self._newgraph_json_request(chart_type,date,id)
