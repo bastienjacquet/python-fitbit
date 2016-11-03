@@ -206,11 +206,6 @@ class Client(object):
 
         return json.loads(self._request_raw("/graph/getNewGraphData", params))
 
-    def _ajax_request(self,requestObject):
-        request_body={"serviceCalls":[requestObject],"template":"activities/modules/models/ajax.response.json.jsp"}
-        request_json= urlencode({"request":json.dumps(request_body, separators=(',',':'))})
-        return json.loads(self._request_raw("/ajaxapi", {},request_body=request_json))
-
     def _graphdata_intraday_request(self, graph_type, date):
         # This method used for the standard case for most intraday calls (data for each 5 minute range)
         xml = self._graphdata_intraday_xml_request(graph_type, date)
@@ -221,7 +216,7 @@ class Client(object):
         return zip(timestamps, values)
     
     def _get_day_details(self,details,date,timeStart=["0","0"],timeEnd=["23","59"]):
-        activity={"isAnnotation":True,
+        activity=json.dumps({"isAnnotation":True,
                         "date":str(date),
                         "clock":"24",
                         "create":"on",
@@ -233,29 +228,24 @@ class Client(object):
                         "annotationEndTimeMinutes":timeEnd[1],
                         "annotationEndTimeDay":"same",
                         "note":"Virtual day activity",
-                        "manualCaloriesEnabled":False}
+                        "manualCaloriesEnabled":False}, separators=(',',':'))
+        # We need two request to receives the details of the added annotation
+        requests=[("POST /api/2/user/activities/annotations", "user", "postActivitiesAnnotations", {"activity":activity}),
+("GET /api/2/user/activities/logs/summary", "user","getActivitiesLogsSummary",{"fromDate":str(date),"toDate":str(date),"period":"day","offset":0,"limit":10})]
+        json_data=self._api2request(requests)
+        if json_data[requests[0][0]]['status']!=200:
+            print json_data[requests[0][0]]['result']
+            return
 
-        request={"id":"POST /api/2/user/activities/annotations",
-                        "name":"user",
-                        "method":"postActivitiesAnnotations",
-                        "args":{"activity":json.dumps(activity, separators=(',',':'))        }}
-        response= self._ajax_request(request)
-        data={};
-        for reqId,reqResponse in response.items():
-            if reqResponse['status']==200:
-                activityId=reqResponse['result']['id']
-                #print reqResponse['result']
-                for graphtype in details:
-                    graphData =self._graphdata_intraday_xml_request_new("activityRecord"+graphtype,reqResponse['result']['date'],arg=activityId)
-                    dataPoints=graphData["graph"]["dataSets"]["activity"]["dataPoints"]
-                    if not data.has_key(graphtype):data[graphtype]=[]
-                    data[graphtype].extend([(d["dateTime"],d["value"]) for d in dataPoints])
-                    #print dataPoints
-                request={"id":"DELETE /api/2/user/activities/annotations/"+str(activityId),
-                        "name":"user",
-                        "method":"deleteActivitiesAnnotations",
-                        "args":{"activityId":activityId}}
-                self._ajax_request(request)
+        activityId=json_data[requests[0][0]]['result']['id']
+        data={}
+        for graphtype in details:
+            graphData =self._graphdata_intraday_xml_request_new("activityRecord"+graphtype,json_data[requests[0][0]]['result']['date'],arg=activityId)
+            dataPoints=graphData["graph"]["dataSets"]["activity"]["dataPoints"]
+            if not data.has_key(graphtype):data[graphtype]=[]
+            data[graphtype].extend([(d["dateTime"],d["value"]) for d in dataPoints])
+            #print dataPoints
+        self._api2request("DELETE /api/2/user/activities/annotations/"+str(activityId), "user", "deleteActivitiesAnnotations", {"activityId":activityId})
         return data
 
     def _graphdata_intraday_sleep_request(self, graph_type, date, sleep_id=None):
