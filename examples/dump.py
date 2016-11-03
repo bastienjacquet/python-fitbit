@@ -25,7 +25,7 @@ parser = OptionParser()
 account_file="~/.fitbit"
 parser.add_option("-e", "--email", dest="email", help="Account email. Default to "+account_file+" account if only one is set.")
 parser.add_option("-p", "--pwd", dest="password", help="Account password. Can be saved in "+account_file+" as email:[pwd]")
-parser.add_option("-d", "--dir", dest="dir", help="Path to save your data.")
+parser.add_option("-d", "--dir", dest="dir", help="Path to save your data.", default="data")
 parser.add_option("-c", "--continue",action="store_true", dest="continue_dumping_old", help="Continue sync even before last previously downloaded data.")
 parser.add_option("-f", "--force",action="store_true", dest="force", help="Force re-downloading of each days.")
 parser.add_option("-s", "--start-date", dest="start_date", help="Minimal date to check. Default is 2010-01-01 .", default="2010-01-01")
