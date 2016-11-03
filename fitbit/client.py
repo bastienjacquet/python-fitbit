@@ -28,7 +28,7 @@ try:
 except ImportError:
     import http.cookiejar as cookielib
 
-import dateutil.parser
+#import dateutil.parser
 import json
 
 logging.basicConfig(filename='example.log', filemode='w', level=logging.DEBUG)
