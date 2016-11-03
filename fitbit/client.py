@@ -39,9 +39,10 @@ class Client(object):
     see README for more details
     """
     
-    def __init__(self, user_id, opener, url_base="http://www.fitbit.com"):
+    def __init__(self, user_id, opener, url_base="http://www.fitbit.com", csrfToken=''):
         self.user_id = user_id
         self.opener = opener
+        self.csrfToken = csrfToken;
         self.url_base = url_base
     
     def intraday_calories_burned(self, date):
@@ -303,8 +304,7 @@ class Client(object):
                 )
 
         api_data = urllib.urlencode(
-            {   'request' : 
-                c})     
+            {   'request' :  c, 'csrfToken': self.csrfToken})
 
         json_data =  self._request_json('/ajaxapi', api_data,"POST")
 
@@ -401,7 +401,9 @@ class Client(object):
             if match is None:
                 match = re.search(r"""/user/([a-zA-Z0-9]+)" """, page)
             user_id = match.group(1)
-
-            return Client(user_id, opener, base_url)
+            # Get CsrfToken '12345678-ABCD-ABCD-ABCD-0123456789AB'
+            match = re.search(r"""window.fitbitCsrfToken = '([0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12})';""", page)
+            csrfToken = match.group(1)
+            return Client(user_id, opener, base_url, csrfToken)
         else:
             raise ValueError("Incorrect username or password.")
